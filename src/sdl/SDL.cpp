@@ -727,10 +727,10 @@ static void sdlResizeVideo()
     if (texture)
         SDL_DestroyTexture(texture);
 
-    surface = SDL_CreateRGBSurface(0, destWidth, destHeight, 32,
-        0x00FF0000, 0x0000FF00,
-        0x000000FF, 0xFF000000);
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+    surface = SDL_CreateRGBSurface(0, destWidth, destHeight, 16,
+        0xf800, 0x7e0,
+        0x1f, 0);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR565,
         SDL_TEXTUREACCESS_STREAMING,
         destWidth, destHeight);
 
@@ -776,11 +776,11 @@ void sdlInitVideo()
         exit(-1);
     }
 
-    uint32_t rmask, gmask, bmask;
+    uint16_t rmask, gmask, bmask;
 
-    rmask = 0x00FF0000;
-    gmask = 0x0000FF00;
-    bmask = 0x000000FF;
+    rmask = 0x1f;
+    gmask = 0x7e0;
+    bmask = 0xf800;
 
     systemRedShift = sdlCalculateShift(rmask);
     systemGreenShift = sdlCalculateShift(gmask);
@@ -790,8 +790,8 @@ void sdlInitVideo()
     //         systemRedShift, systemGreenShift, systemBlueShift);
     //  originally 3, 11, 19 -> 27, 19, 11
 
-    systemColorDepth = 32;
-    srcPitch = sizeX * 4 + 4;
+    systemColorDepth = 16;
+    srcPitch = sizeX * 2 + 4;
 
     sdlResizeVideo();
 }
@@ -1866,10 +1866,10 @@ void systemDrawScreen()
     screen = (uint8_t*)surface->pixels;
     SDL_LockSurface(surface);
 
-    if (ifbFunction)
-        ifbFunction(pix + srcPitch, srcPitch, sizeX, sizeY);
+    /*if (ifbFunction)
+        ifbFunction(pix + srcPitch, srcPitch, sizeX, sizeY);*/
 
-    filterFunction(pix + srcPitch, srcPitch, delta, screen,
+    filterFunction(pix, srcPitch, delta, screen,
         destPitch, sizeX, sizeY);
 
 
