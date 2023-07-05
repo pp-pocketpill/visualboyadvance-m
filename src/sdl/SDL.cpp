@@ -134,6 +134,7 @@ SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 SDL_Texture* texture = NULL;
 SDL_GLContext glcontext;
+SDL_Rect offsetRect;
 
 int systemSpeed = 0;
 int systemRedShift = 0;
@@ -852,8 +853,13 @@ void sdlInitVideo()
         flags |= SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
     }
 
-    screenWidth = destWidth;
-    screenHeight = destHeight;
+    screenWidth = 240;
+    screenHeight = 240;
+
+    offsetRect.x = (screenWidth - destWidth) / 2;
+    offsetRect.y = (screenHeight - destHeight) / 2;
+    offsetRect.w = destWidth;
+    offsetRect.h = destHeight;
 
     if (window)
         SDL_DestroyWindow(window);
@@ -2048,7 +2054,8 @@ void systemDrawScreen()
     } else {
         SDL_UnlockSurface(surface);
         SDL_UpdateTexture(texture, NULL, surface->pixels, surface->pitch);
-        SDL_RenderCopy(renderer, texture, NULL, NULL);
+        SDL_RenderFillRect(renderer, NULL);
+        SDL_RenderCopy(renderer, texture, NULL, &offsetRect);
         SDL_RenderPresent(renderer);
     }
 }
