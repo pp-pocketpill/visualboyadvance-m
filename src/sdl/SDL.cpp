@@ -16,12 +16,6 @@
 // along with this program; if not, write to the Free Software Foundation,
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-//OpenGL library
-#if (defined _MSC_VER)
-#pragma comment(lib, "OpenGL32")
-#include <windows.h>
-#endif
-
 #include <cmath>
 #include <stdarg.h>
 #include <stdio.h>
@@ -29,15 +23,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#ifdef __APPLE__
-#include <OpenGL/OpenGL.h>
-#include <OpenGL/glext.h>
-#include <OpenGL/glu.h>
-#else
-#include <GL/gl.h>
-#include <GL/glext.h>
-#include <GL/glu.h>
-#endif
 
 #include <time.h>
 
@@ -133,7 +118,6 @@ SDL_Surface* surface = NULL;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 SDL_Texture* texture = NULL;
-SDL_GLContext glcontext;
 SDL_Rect offsetRect;
 
 int systemSpeed = 0;
@@ -177,7 +161,6 @@ int filter_enlarge = 2;
 int cartridgeType = 3;
 
 int textureSize = 256;
-GLuint screenTexture = 0;
 uint8_t* filterPix = 0;
 
 int emulating = 0;
@@ -201,7 +184,6 @@ static int saveSlotPosition = 0; // default is the slot from normal F1
 // internal slot number for undoing the last save
 #define SLOT_POS_SAVE_BACKUP 9
 
-static int sdlOpenglScale = 1;
 // will scale window on init by this much
 static int sdlSoundToggledOff = 0;
 
@@ -473,75 +455,6 @@ FILE* sdlFindFile(const char* name)
     return NULL;
 }
 
-static void sdlOpenGLScaleWithAspect(int w, int h)
-{
-    float screenAspect = (float)sizeX / sizeY,
-          windowAspect = (float)w / h;
-
-    if (windowAspect == screenAspect)
-        glViewport(0, 0, w, h);
-    else if (windowAspect < screenAspect) {
-        int height = (int)(w / screenAspect);
-        glViewport(0, (h - height) / 2, w, height);
-    } else {
-        int width = (int)(h * screenAspect);
-        glViewport((w - width) / 2, 0, width, h);
-    }
-}
-
-static void sdlOpenGLVideoResize()
-{
-    if (glIsTexture(screenTexture))
-        glDeleteTextures(1, &screenTexture);
-
-    glGenTextures(1, &screenTexture);
-    glBindTexture(GL_TEXTURE_2D, screenTexture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-        openGL == 2 ? GL_LINEAR : GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-        openGL == 2 ? GL_LINEAR : GL_NEAREST);
-
-    // Calculate texture size as the smallest working power of two
-    float n1 = log10((float)destWidth) / log10(2.0f);
-    float n2 = log10((float)destHeight) / log10(2.0f);
-    float n = (n1 > n2) ? n1 : n2;
-
-    // round up
-    if (((float)((int)n)) != n)
-        n = ((float)((int)n)) + 1.0f;
-
-    textureSize = (int)pow(2.0f, n);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureSize, textureSize, 0,
-        GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    sdlOpenGLScaleWithAspect(destWidth, destHeight);
-}
-
-void sdlOpenGLInit(int w, int h)
-{
-    (void)w; // unused params
-    (void)h; // unused params
-
-    glDisable(GL_CULL_FACE);
-    glEnable(GL_TEXTURE_2D);
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-
-    glOrtho(0.0, 1.0, 1.0, 0.0, 0.0, 1.0);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-
-    sdlOpenGLVideoResize();
-}
-
 static void sdlApplyPerImagePreferences()
 {
     FILE* f = sdlFindFile("vba-over.ini");
@@ -809,27 +722,19 @@ static void sdlResizeVideo()
     destWidth = filter_enlarge * sizeX;
     destHeight = filter_enlarge * sizeY;
 
-    if (openGL) {
-        free(filterPix);
-        filterPix = (uint8_t*)calloc(1, (systemColorDepth >> 3) * destWidth * destHeight);
-        sdlOpenGLVideoResize();
-    }
-
     if (surface)
         SDL_FreeSurface(surface);
     if (texture)
         SDL_DestroyTexture(texture);
 
-    if (!openGL) {
-        surface = SDL_CreateRGBSurface(0, destWidth, destHeight, 32,
-            0x00FF0000, 0x0000FF00,
-            0x000000FF, 0xFF000000);
-        texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-            SDL_TEXTUREACCESS_STREAMING,
-            destWidth, destHeight);
-    }
+    surface = SDL_CreateRGBSurface(0, destWidth, destHeight, 32,
+        0x00FF0000, 0x0000FF00,
+        0x000000FF, 0xFF000000);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+        SDL_TEXTUREACCESS_STREAMING,
+        destWidth, destHeight);
 
-    if (!openGL && surface == NULL) {
+    if (surface == NULL) {
         systemMessage(0, "Failed to set video mode");
         SDL_Quit();
         exit(-1);
@@ -848,10 +753,6 @@ void sdlInitVideo()
     destHeight = filter_enlarge * sizeY;
 
     flags = fullScreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
-    if (openGL) {
-        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-        flags |= SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
-    }
 
     screenWidth = 240;
     screenHeight = 240;
@@ -867,9 +768,7 @@ void sdlInitVideo()
         SDL_DestroyRenderer(renderer);
     window = SDL_CreateWindow("VBA-M", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
         screenWidth, screenHeight, flags);
-    if (!openGL) {
-        renderer = SDL_CreateRenderer(window, -1, 0);
-    }
+    renderer = SDL_CreateRenderer(window, -1, 0);
 
     if (window == NULL) {
         systemMessage(0, "Failed to set video mode");
@@ -879,15 +778,9 @@ void sdlInitVideo()
 
     uint32_t rmask, gmask, bmask;
 
-    if (openGL) {
-        rmask = 0xFF000000;
-        gmask = 0x00FF0000;
-        bmask = 0x0000FF00;
-    } else {
-        rmask = 0x00FF0000;
-        gmask = 0x0000FF00;
-        bmask = 0x000000FF;
-    }
+    rmask = 0x00FF0000;
+    gmask = 0x0000FF00;
+    bmask = 0x000000FF;
 
     systemRedShift = sdlCalculateShift(rmask);
     systemGreenShift = sdlCalculateShift(gmask);
@@ -897,20 +790,8 @@ void sdlInitVideo()
     //         systemRedShift, systemGreenShift, systemBlueShift);
     //  originally 3, 11, 19 -> 27, 19, 11
 
-    if (openGL) {
-        // Align to BGRA instead of ABGR
-        systemRedShift += 8;
-        systemGreenShift += 8;
-        systemBlueShift += 8;
-    }
-
     systemColorDepth = 32;
     srcPitch = sizeX * 4 + 4;
-
-    if (openGL) {
-        glcontext = SDL_GL_CreateContext(window);
-        sdlOpenGLInit(screenWidth, screenHeight);
-    }
 
     sdlResizeVideo();
 }
@@ -1070,8 +951,6 @@ void sdlPollEvents()
                 }
                 break;
             case SDL_WINDOWEVENT_RESIZED:
-                if (openGL)
-                    sdlOpenGLScaleWithAspect(event.window.data1, event.window.data2);
                 break;
             }
             break;
@@ -1206,12 +1085,6 @@ void sdlPollEvents()
                 if (!(event.key.keysym.mod & MOD_NOCTRL) && (event.key.keysym.mod & KMOD_CTRL)) {
                     fullScreen = !fullScreen;
                     SDL_SetWindowFullscreen(window, fullScreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
-                    if (openGL) {
-                        if (fullScreen)
-                            sdlOpenGLScaleWithAspect(desktopWidth, desktopHeight);
-                        else
-                            sdlOpenGLScaleWithAspect(destWidth, destHeight);
-                    }
                     //sdlInitVideo();
                 }
                 break;
@@ -1437,10 +1310,6 @@ void usage(char* cmd)
     printf("\
 \n\
 Options:\n\
-  -O, --opengl=MODE            Set OpenGL texture filter\n\
-      --no-opengl               0 - Disable OpenGL\n\
-      --opengl-nearest          1 - No filtering\n\
-      --opengl-bilinear         2 - Bilinear filtering\n\
   -F, --fullscreen             Full screen\n\
   -G, --gdb=PROTOCOL           GNU Remote Stub mode:\n\
                                 tcp      - use TCP at port 55555\n\
@@ -1657,7 +1526,6 @@ int main(int argc, char** argv)
         batteryDir = NULL;
 
     sdlSaveKeysSwitch = (ReadPrefHex("saveKeysSwitch"));
-    sdlOpenglScale = (ReadPrefHex("openGLscale"));
 
     if (optPrintUsage) {
         usage(argv[0]);
@@ -1920,10 +1788,6 @@ int main(int argc, char** argv)
     remoteCleanUp();
     soundShutdown();
 
-    if (openGL) {
-        SDL_GL_DeleteContext(glcontext);
-    }
-
     if (gbRom != NULL || rom != NULL) {
         sdlWriteBattery();
         emulator.emuCleanUp();
@@ -1999,12 +1863,8 @@ void systemDrawScreen()
 
     renderedFrames++;
 
-    if (openGL)
-        screen = filterPix;
-    else {
-        screen = (uint8_t*)surface->pixels;
-        SDL_LockSurface(surface);
-    }
+    screen = (uint8_t*)surface->pixels;
+    SDL_LockSurface(surface);
 
     if (ifbFunction)
         ifbFunction(pix + srcPitch, srcPitch, sizeX, sizeY);
@@ -2012,52 +1872,17 @@ void systemDrawScreen()
     filterFunction(pix + srcPitch, srcPitch, delta, screen,
         destPitch, sizeX, sizeY);
 
-    if (openGL) {
-        int bytes = (systemColorDepth >> 3);
-        for (int i = 0; i < destWidth; i++)
-            for (int j = 0; j < destHeight; j++) {
-                uint8_t k;
-                k = filterPix[i * bytes + j * destPitch + 3];
-                filterPix[i * bytes + j * destPitch + 3] = filterPix[i * bytes + j * destPitch + 1];
-                filterPix[i * bytes + j * destPitch + 1] = k;
-            }
-    }
 
     drawScreenMessage(screen, destPitch, 10, destHeight - 20, 3000);
 
     if (showSpeed && fullScreen)
         drawSpeed(screen, destPitch, 10, 20);
 
-    if (openGL) {
-        glClear(GL_COLOR_BUFFER_BIT);
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, destWidth);
-        if (systemColorDepth == 16)
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, destWidth, destHeight,
-                GL_RGB, GL_UNSIGNED_SHORT_5_6_5, screen);
-        else
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, destWidth, destHeight,
-                //GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, screen);
-                GL_RGBA, GL_UNSIGNED_BYTE, screen);
-
-        glBegin(GL_TRIANGLE_STRIP);
-        glTexCoord2f(0.0f, 0.0f);
-        glVertex3i(0, 0, 0);
-        glTexCoord2f(destWidth / (GLfloat)textureSize, 0.0f);
-        glVertex3i(1, 0, 0);
-        glTexCoord2f(0.0f, destHeight / (GLfloat)textureSize);
-        glVertex3i(0, 1, 0);
-        glTexCoord2f(destWidth / (GLfloat)textureSize,
-            destHeight / (GLfloat)textureSize);
-        glVertex3i(1, 1, 0);
-        glEnd();
-        SDL_GL_SwapWindow(window);
-    } else {
-        SDL_UnlockSurface(surface);
-        SDL_UpdateTexture(texture, NULL, surface->pixels, surface->pitch);
-        SDL_RenderFillRect(renderer, NULL);
-        SDL_RenderCopy(renderer, texture, NULL, &offsetRect);
-        SDL_RenderPresent(renderer);
-    }
+    SDL_UnlockSurface(surface);
+    SDL_UpdateTexture(texture, NULL, surface->pixels, surface->pitch);
+    SDL_RenderFillRect(renderer, NULL);
+    SDL_RenderCopy(renderer, texture, NULL, &offsetRect);
+    SDL_RenderPresent(renderer);
 }
 
 void systemSendScreen()

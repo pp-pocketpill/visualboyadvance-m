@@ -117,7 +117,6 @@ int filter = kStretch2x;
 int frameSkip = 1;
 int fullScreen;
 int ifbType = kIFBNone;
-int openGL;
 int optFlashSize;
 int optPrintUsage;
 int pauseWhenInactive = 0;
@@ -185,14 +184,10 @@ struct option argOptions[] = {
 	{ "no-agb-print", no_argument, &agbPrint, 0 },
 	{ "no-auto-frameskip", no_argument, &autoFrameSkip, 0 },
 	{ "no-debug", no_argument, 0, 'N' },
-	{ "no-opengl", no_argument, &openGL, 0 },
 	{ "no-patch", no_argument, &autoPatch, 0 },
 	{ "no-pause-when-inactive", no_argument, &pauseWhenInactive, 0 },
 	{ "no-rtc", no_argument, &coreOptions.rtcEnabled, 0 },
 	{ "no-show-speed", no_argument, &showSpeed, 0 },
-	{ "opengl", required_argument, 0, 'O' },
-	{ "opengl-bilinear", no_argument, &openGL, 2 },
-	{ "opengl-nearest", no_argument, &openGL, 1 },
 	{ "opt-flash-size", required_argument, 0, OPT_OPT_FLASH_SIZE },
 	{ "patch", required_argument, 0, 'i' },
 	{ "pause-when-inactive", no_argument, &pauseWhenInactive, 1 },
@@ -317,7 +312,6 @@ void LoadConfig()
 	gb_effects_config.surround = ReadPref("gbSoundEffectsSurround", 0);
 	ifbType = ReadPref("ifbType", 0);
 	coreOptions.loadDotCodeFile = ReadPrefString("loadDotCodeFile");
-	openGL = ReadPrefHex("openGL");
 	optFlashSize = ReadPref("flashSize", 0);
 	pauseWhenInactive = ReadPref("pauseWhenInactive", 1);
 	rewindTimer = ReadPref("rewindTimer", 0);
@@ -795,15 +789,6 @@ int ReadOpts(int argc, char ** argv)
 			break;
 		case '?':
 			optPrintUsage = 1;
-			break;
-		case 'O':
-			if (optarg) {
-				openGL = atoi(optarg);
-				if (openGL < 0 || openGL > 2)
-					openGL = 1;
-			}
-			else
-				openGL = 0;
 			break;
 
 		case OPT_CAPTURE_FORMAT:

@@ -31,7 +31,6 @@ extern int filter;
 extern int frameSkip;
 extern int fullScreen;
 extern int ifbType;
-extern int openGL;
 extern int optFlashSize;
 extern int optPrintUsage;
 extern int pauseWhenInactive;
