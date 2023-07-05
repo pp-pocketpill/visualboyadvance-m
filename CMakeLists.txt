@@ -713,7 +713,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID STREQUAL Clang AND NOT MSVC
             endif()
         endif()
 
-        set(MY_C_FLAGS ${MY_C_FLAGS} -fopenmp)
+        # set(MY_C_FLAGS ${MY_C_FLAGS} -fopenmp)
     endif()
 
     if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
