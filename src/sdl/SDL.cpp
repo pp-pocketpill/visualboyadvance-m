@@ -115,9 +115,8 @@ struct EmulatedSystem emulator = {
 };
 
 SDL_Surface* surface = NULL;
+SDL_Surface* winSurface = NULL;
 SDL_Window* window = NULL;
-SDL_Renderer* renderer = NULL;
-SDL_Texture* texture = NULL;
 SDL_Rect offsetRect;
 
 int systemSpeed = 0;
@@ -724,15 +723,9 @@ static void sdlResizeVideo()
 
     if (surface)
         SDL_FreeSurface(surface);
-    if (texture)
-        SDL_DestroyTexture(texture);
 
     surface = SDL_CreateRGBSurface(0, destWidth, destHeight, 16,
-        0xf800, 0x7e0,
-        0x1f, 0);
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR565,
-        SDL_TEXTUREACCESS_STREAMING,
-        destWidth, destHeight);
+        0x1f, 0x7e0, 0xf800, 0);
 
     if (surface == NULL) {
         systemMessage(0, "Failed to set video mode");
@@ -764,11 +757,10 @@ void sdlInitVideo()
 
     if (window)
         SDL_DestroyWindow(window);
-    if (renderer)
-        SDL_DestroyRenderer(renderer);
     window = SDL_CreateWindow("VBA-M", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
         screenWidth, screenHeight, flags);
-    renderer = SDL_CreateRenderer(window, -1, 0);
+
+    winSurface = SDL_GetWindowSurface(window);
 
     if (window == NULL) {
         systemMessage(0, "Failed to set video mode");
@@ -1879,10 +1871,9 @@ void systemDrawScreen()
         drawSpeed(screen, destPitch, 10, 20);
 
     SDL_UnlockSurface(surface);
-    SDL_UpdateTexture(texture, NULL, surface->pixels, surface->pitch);
-    SDL_RenderFillRect(renderer, NULL);
-    SDL_RenderCopy(renderer, texture, NULL, &offsetRect);
-    SDL_RenderPresent(renderer);
+
+    SDL_UpperBlitScaled(surface, NULL, winSurface, &offsetRect);
+    SDL_UpdateWindowSurface(window);
 }
 
 void systemSendScreen()
